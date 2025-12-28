@@ -19,6 +19,10 @@ bun install
 bun run dev https://example.com
 ```
 
+## Terminal Support
+
+Works well in [Ghostty](https://ghostty.org/). Other terminals are unsupported.
+
 ## Controls
 
 - Scroll with mouse wheel
