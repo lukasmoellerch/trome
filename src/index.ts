@@ -10,6 +10,119 @@ import {
 } from "@opentui/core"
 import sharp from "sharp"
 import { chromium, type Browser, type Page } from "playwright"
+import { spawn } from "child_process"
+
+// Progress bar rendering for terminal
+function renderProgressBar(progress: number, width: number = 40): string {
+  const filled = Math.round(progress * width)
+  const empty = width - filled
+  const bar = "█".repeat(filled) + "░".repeat(empty)
+  const percentage = Math.round(progress * 100)
+  return `[${bar}] ${percentage}%`
+}
+
+// Check if Playwright Chromium is installed
+async function isChromiumInstalled(): Promise<boolean> {
+  try {
+    // Try to get the executable path - this throws if not installed
+    const browser = await chromium.launch({ headless: true })
+    await browser.close()
+    return true
+  } catch (error) {
+    // Check if the error is about browser not being installed
+    const errorMessage = String(error)
+    if (
+      errorMessage.includes("Executable doesn't exist") ||
+      errorMessage.includes("browserType.launch") ||
+      errorMessage.includes("PLAYWRIGHT_BROWSERS_PATH")
+    ) {
+      return false
+    }
+    // For other errors, assume it's installed but there's another issue
+    return true
+  }
+}
+
+// Install Playwright Chromium with progress bar
+async function installChromium(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    console.log("\n🌐 Playwright Chromium browser not found.")
+    console.log("📦 Installing Chromium browser...\n")
+
+    let progress = 0
+    let lastOutput = ""
+
+    // Start the installation process
+    const installProcess = spawn("npx", ["playwright", "install", "chromium"], {
+      shell: false,
+      stdio: ["inherit", "pipe", "pipe"],
+    })
+
+    // Simulate progress based on output and time
+    const progressInterval = setInterval(() => {
+      if (progress < 0.95) {
+        // Increment progress slowly
+        progress += 0.02
+        process.stdout.write(`\r${renderProgressBar(progress)}  Installing...`)
+      }
+    }, 200)
+
+    installProcess.stdout?.on("data", (data: Buffer) => {
+      lastOutput = data.toString()
+      // Speed up progress when we see actual download activity
+      if (lastOutput.includes("Downloading") || lastOutput.includes("%")) {
+        progress = Math.min(progress + 0.05, 0.9)
+      }
+    })
+
+    installProcess.stderr?.on("data", (data: Buffer) => {
+      const output = data.toString()
+      // Playwright outputs progress to stderr
+      if (output.includes("%")) {
+        // Try to parse percentage from output
+        const match = output.match(/(\d+)%/)
+        if (match) {
+          progress = Math.min(parseInt(match[1], 10) / 100, 0.99)
+          process.stdout.write(`\r${renderProgressBar(progress)}  ${output.trim().slice(0, 30)}`)
+        }
+      }
+    })
+
+    installProcess.on("close", (code) => {
+      clearInterval(progressInterval)
+      if (code === 0) {
+        process.stdout.write(`\r${renderProgressBar(1)}  Done!          \n`)
+        console.log("\n✅ Chromium browser installed successfully!\n")
+        resolve()
+      } else {
+        console.error(`\n\n❌ Failed to install Chromium (exit code: ${code})`)
+        console.error("Please run manually: npx playwright install chromium")
+        reject(new Error(`Installation failed with code ${code}`))
+      }
+    })
+
+    installProcess.on("error", (error) => {
+      clearInterval(progressInterval)
+      console.error("\n\n❌ Failed to start installation:", error.message)
+      reject(error)
+    })
+  })
+}
+
+// Ensure Chromium is installed before starting
+async function ensureChromiumInstalled(): Promise<void> {
+  process.stdout.write("🔍 Checking for Playwright Chromium... ")
+
+  const installed = await isChromiumInstalled()
+
+  if (installed) {
+    console.log("✓ Found!")
+    return
+  }
+
+  console.log("Not found.")
+  await installChromium()
+}
 
 // Command palette action definition
 interface CommandAction {
@@ -42,6 +155,9 @@ if (!url) {
 }
 
 async function main() {
+  // Ensure Playwright Chromium is installed
+  await ensureChromiumInstalled()
+
   // Create the CLI renderer first to get terminal dimensions
   const renderer = await createCliRenderer({
     exitOnCtrlC: false,

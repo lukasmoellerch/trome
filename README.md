@@ -6,9 +6,16 @@ Uses Playwright to render pages headlessly and displays them using half-block ch
 
 ## Usage
 
+### Quick Start (bunx)
+
+```bash
+bunx github:lukasmoellerch/trome https://example.com
+```
+
+### From Source
+
 ```bash
 bun install
-npx playwright install chromium
 bun run dev https://example.com
 ```
 

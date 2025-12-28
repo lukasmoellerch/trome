@@ -4,6 +4,9 @@
   "description": "OpenTUI terminal application",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "trome": "src/index.ts"
+  },
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target node",
